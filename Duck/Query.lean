@@ -8,25 +8,26 @@ open Lean.Elab.Command
 open Lean.Meta
 
 declare_syntax_cat queryBinder
+
 syntax "(" ident+ ":" term ")" : queryBinder
 
 declare_syntax_cat query
 syntax queryBinder* ":" queryBinder+ : query
 
-def mkForalls [Monad m] [MonadQuotation m] (xs : Array (Name × Syntax))
-    (e : Syntax) : m Syntax :=
+def mkForalls [Monad m] [MonadQuotation m] (xs : Array (Name × Term))
+    (e : Term) : m Term :=
   let vs := xs.map (mkIdent ·.fst)
   let ts := xs.map (·.snd)
   `(∀ $[($vs:ident : $ts:term)]*, $e:term)
 
-def mkExistss [Monad m] [MonadQuotation m] (xs : Array (Name × Syntax))
-    (e : Syntax) : m Syntax := do
+def mkExistss [Monad m] [MonadQuotation m] (xs : Array (Name × Term))
+    (e : Term) : m Term := do
   let vs := xs.map (mkIdent ·.fst)
   let ts := xs.map (·.snd)
   `(∃ $[($vs:ident : $ts:term)]*, $e:term)
 
-def queryBindersToArray (stx : Array Syntax) :
-    TermElabM (Array (Name × Syntax)) :=
+def queryBindersToArray (stx : Array (TSyntax `queryBinder)) :
+    TermElabM (Array (Name × Term)) :=
   stx.concatMapM λ stx => withRef stx do
     match stx with
     | `(queryBinder| ($ids:ident* : $t:term)) =>
@@ -35,7 +36,7 @@ def queryBindersToArray (stx : Array Syntax) :
 
 @[inline]
 def matchExistsIntro : Expr → Option (Level × Expr × Expr × Expr × Expr)
-  | .app (.app (.app (.app (.const ``Exists.intro [u] _) type _) p _ ) w _) e _ =>
+  | .app (.app (.app (.app (.const ``Exists.intro [u]) type) p) w) e =>
     some (u, type, p, w, e)
   | _ => none
 
@@ -59,8 +60,8 @@ def existsIntroBoundedTelescope (e : Expr) (n : Nat)
         let e ← whnf e
         match matchExistsIntro e with
         | none => k fvarIds e
-        | some (u, ty, p, w, e) =>
-          let userName ← forallBoundedTelescope p (some 1) λ fvars e =>
+        | some (_, ty, p, w, e) =>
+          let userName ← forallBoundedTelescope p (some 1) λ fvars _ =>
             if h : 0 < fvars.size then
               return (← getLocalDecl $ fvars.get ⟨0, h⟩ |>.fvarId!).userName
             else
@@ -72,24 +73,24 @@ def existsIntroBoundedTelescope (e : Expr) (n : Nat)
               "existsIntroBoundedTelescope: result of kabstract is not type-correct"
             go (fvarIds.push letDeclFVarId) e n
 
-def printResult (e : Expr) (assumptionStxs : Array (Name × Syntax))
-    (conclusionStxs : Array (Name × Syntax)) : MetaM MessageData :=
-  let numAssumptions := assumptionStxs.size
+def printResult (e : Expr) (assumptionStxs : Array (Name × Term))
+    (conclusionStxs : Array (Name × Term)) : MetaM MessageData :=
   let numConclusions := conclusionStxs.size
   existsIntroBoundedTelescope e numConclusions λ fvarIds _ => do
-    if fvarIds.size != numConclusions then
+    if h : fvarIds.size = conclusionStxs.size then
+      let conclusionsMsgs ← fvarIds.mapIdxM λ i fvarId => do
+        let value ← reduceAll (← getLocalDecl fvarId).value
+        have : i < conclusionStxs.size := by simp [←h, i.isLt]
+        let (name, type) := conclusionStxs[i]
+        let name := name.eraseMacroScopes
+        return m!"{name} : {type} := {value}"
+      let assumptionsMsg := joinLn $ assumptionStxs.map λ (name, type) =>
+        m!"{name} : {type}"
+      let assumptionsMsg :=
+        if assumptionsMsg.isEmpty then m!"" else assumptionsMsg ++ "\n"
+      addMessageContextFull $ assumptionsMsg ++ "---\n" ++ joinLn conclusionsMsgs
+    else
       throwError "printResult: unexpected number of ∃ binders"
-    let conclusionsMsgs ← fvarIds.mapIdxM λ i fvarId => do
-      let value ← reduceAll (← getLocalDecl fvarId).value
-      let (name, type) := conclusionStxs[i]
-      let name := name.eraseMacroScopes
-      return m!"{name} : {type} := {value}"
-
-    let assumptionsMsg := joinLn $ assumptionStxs.map λ (name, type) =>
-      m!"{name} : {type}"
-    let assumptionsMsg :=
-      if assumptionsMsg.isEmpty then m!"" else assumptionsMsg ++ "\n"
-    addMessageContextFull $ assumptionsMsg ++ "---\n" ++ joinLn conclusionsMsgs
   where
     joinLn (msgs : Array MessageData) : MessageData :=
       .joinSep msgs.toList "\n"
