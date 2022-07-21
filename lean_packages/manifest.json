@@ -1,0 +1,5 @@
+{"version": 1,
+ "packages":
+ [{"url": "https://github.com/JLimperg/aesop",
+   "rev": "d3184e223323fd325811fbbeb30ff098ebb342a3",
+   "name": "aesop"}]}

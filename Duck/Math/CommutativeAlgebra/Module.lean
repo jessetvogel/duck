@@ -12,11 +12,11 @@ axiom ModuleHom {R : Ring} (M N : Module R) : Type
 -- Category structure
 instance (R : Ring) : Category (Module R) where
   Hom := ModuleHom
-  id := sorryAx
-  comp := sorryAx
-  comp_assoc := sorryAx
-  comp_id := sorryAx
-  id_comp := sorryAx
+  id := sorry
+  comp := sorry
+  comp_assoc := sorry
+  comp_id := sorry
+  id_comp := sorry
 
 variable {R : Ring}
 

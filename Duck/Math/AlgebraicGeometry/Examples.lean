@@ -9,10 +9,10 @@ namespace Math.AlgebraicGeometry
 
 @[aesop 99%] axiom Spec : Ring → Scheme
 @[aesop 99%] axiom SpecMap {R S : Ring} (f : R ⟶ S) : Spec S ⟶ Spec R
-instance : ContraFunctor Spec where
+noncomputable instance : ContraFunctor Spec where
   map := SpecMap
-  id := sorryAx
-  comp := sorryAx
+  id := sorry
+  comp := sorry
 
 -- The empty scheme $\varnothing = \Spec(\{ 0 \})$.
 @[aesop 99%] noncomputable def empty_scheme := Spec zero_ring
