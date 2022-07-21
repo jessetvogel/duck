@@ -98,7 +98,9 @@ def aesopWrapper (goal : MVarId) : TermElabM (Option Expr) :=
   try
     discard $ Aesop.bestFirst goal
     getExprMVarAssignment? goal
-  catch _ => return none
+  catch error => do
+    trace[debug] error.toMessageData
+    return none
 
 elab cmd:"#query" q:query : command => withRef cmd do
   match q with
