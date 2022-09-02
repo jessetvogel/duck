@@ -83,7 +83,7 @@ def printResult (e : Expr) (assumptionStxs : Array (Name × Term))
         have : i < conclusionStxs.size := by simp [←h, i.isLt]
         let (name, type) := conclusionStxs[i]
         let name := name.eraseMacroScopes
-        return m!"{name} : {type} := {value}"
+        return m!"{name} := {value}"
       let assumptionsMsg := joinLn $ assumptionStxs.map λ (name, type) =>
         m!"{name} : {type}"
       let assumptionsMsg :=

@@ -6,13 +6,14 @@ open Math.CategoryTheory
 namespace Math.CommutativeAlgebra
 
 -- The type of modules over a given ring $R$.
-axiom Module (R : Ring) : Type
-axiom ModuleHom {R : Ring} (M N : Module R) : Type
+@[aesop 99%] axiom Module (R : Ring) : Type
+@[aesop 99%] axiom ModuleHom {R : Ring} (M N : Module R) : Type
+@[aesop 99%] axiom ModuleId {R : Ring} (M : Module R) : ModuleHom M M
 
 -- Category structure
-instance (R : Ring) : Category (Module R) where
+noncomputable instance (R : Ring) : Category (Module R) where
   Hom := ModuleHom
-  id := sorry
+  id := ModuleId
   comp := sorry
   comp_assoc := sorry
   comp_id := sorry
