@@ -94,13 +94,20 @@ def printResult (e : Expr) (assumptionStxs : Array (Name × Term))
     joinLn (msgs : Array MessageData) : MessageData :=
       .joinSep msgs.toList "\n"
 
-def aesopWrapper (goal : MVarId) : TermElabM (Option Expr) :=
+def duckAesop (goal : MVarId) : MetaM (List MVarId) :=
+  return (← Aesop.search goal).1.toList
+
+def duckAesopProof? (goal : MVarId) : MetaM (Option Expr) :=
   try
-    discard $ Aesop.search goal
+    discard $ duckAesop goal
     getExprMVarAssignment? goal
   catch error => do
     trace[debug] error.toMessageData
     return none
+
+open Lean.Elab.Tactic in
+elab &"duck_aesop" : tactic =>
+  liftMetaTactic duckAesop
 
 elab cmd:"#query" q:query : command => withRef cmd do
   match q with
@@ -112,7 +119,7 @@ elab cmd:"#query" q:query : command => withRef cmd do
       let tgt ← elabTermAndSynthesize stx (some $ mkSort levelZero)
       let goal := (← mkFreshExprMVar (some tgt)).mvarId!
       let (_, goal) ← goal.introN assumptionStxs.size
-      let (some result) ← aesopWrapper goal
+      let (some result) ← duckAesopProof? goal
         | throwError "No solution found."
       goal.withContext do
         addMessageContext (← printResult result assumptionStxs conclusionStxs)
