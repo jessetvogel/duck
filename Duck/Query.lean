@@ -94,8 +94,17 @@ def printResult (e : Expr) (assumptionStxs : Array (Name × Term))
     joinLn (msgs : Array MessageData) : MessageData :=
       .joinSep msgs.toList "\n"
 
-def duckAesop (goal : MVarId) : MetaM (List MVarId) :=
-  return (← Aesop.search goal).1.toList
+def duckAesop (goal : MVarId) : MetaM (List MVarId) := do
+  let rs ← Aesop.Frontend.getDefaultRuleSet (includeGlobalSimpTheorems := false)
+    -- We do not include the global simp set (i.e. the @[simp] lemmas). This is
+    -- important for two reasons:
+    --
+    -- - The global simp set rewrites `∃ x : T, True` to `T` and
+    --   `∃ x : T, ∃ h : P x, ∃ h : P x, True` to `∃ x : T, P x`. This messes up
+    --   our parser.
+    -- - Rewriting leads to incomprehensible proof terms.
+  let (goals, _) ← Aesop.search goal (ruleSet? := rs)
+  return goals.toList
 
 def duckAesopProof? (goal : MVarId) : MetaM (Option Expr) :=
   try
