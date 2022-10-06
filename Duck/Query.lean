@@ -1,5 +1,4 @@
 import Aesop
-import Lean
 
 open Lean
 open Lean.Elab
@@ -63,7 +62,7 @@ def existsIntroBoundedTelescope (e : Expr) (n : Nat)
         | some (_, ty, p, w, e) =>
           let userName ← forallBoundedTelescope p (some 1) λ fvars _ =>
             if h : 0 < fvars.size then
-              return (← getLocalDecl $ fvars.get ⟨0, h⟩ |>.fvarId!).userName
+              fvars.get ⟨0, h⟩ |>.fvarId!.getUserName
             else
               mkFreshUserName `h
           withLetDecl userName ty w λ letDecl => do
@@ -79,7 +78,7 @@ def printResult (e : Expr) (assumptionStxs : Array (Name × Term))
   existsIntroBoundedTelescope e numConclusions λ fvarIds _ => do
     if h : fvarIds.size = conclusionStxs.size then
       let conclusionsMsgs ← fvarIds.mapIdxM λ i fvarId => do
-        let value ← reduceAll (← getLocalDecl fvarId).value
+        let value ← reduceAll (← fvarId.getDecl).value
         have : i < conclusionStxs.size := by simp [←h, i.isLt]
         let (name, type) := conclusionStxs[i]
         let name := name.eraseMacroScopes
@@ -97,7 +96,7 @@ def printResult (e : Expr) (assumptionStxs : Array (Name × Term))
 
 def aesopWrapper (goal : MVarId) : TermElabM (Option Expr) :=
   try
-    discard $ Aesop.bestFirst goal
+    discard $ Aesop.search goal
     getExprMVarAssignment? goal
   catch error => do
     trace[debug] error.toMessageData
@@ -105,17 +104,17 @@ def aesopWrapper (goal : MVarId) : TermElabM (Option Expr) :=
 
 elab cmd:"#query" q:query : command => withRef cmd do
   match q with
-  | `(query| $p₁:queryBinder* : $p₂:queryBinder*) => liftTermElabM none do
+  | `(query| $p₁:queryBinder* : $p₂:queryBinder*) => liftTermElabM do
     let assumptionStxs ← queryBindersToArray p₁
     let conclusionStxs ← queryBindersToArray p₂
     let stx ← mkForalls assumptionStxs (← mkExistss conclusionStxs (← `(True)))
     let msg ← withoutModifyingState do
       let tgt ← elabTermAndSynthesize stx (some $ mkSort levelZero)
       let goal := (← mkFreshExprMVar (some tgt)).mvarId!
-      let (_, goal) ← introN goal assumptionStxs.size
+      let (_, goal) ← goal.introN assumptionStxs.size
       let (some result) ← aesopWrapper goal
         | throwError "No solution found."
-      withMVarContext goal do
+      goal.withContext do
         addMessageContext (← printResult result assumptionStxs conclusionStxs)
     logInfo msg
   | _ => throwUnsupportedSyntax
